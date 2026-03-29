@@ -1,0 +1,60 @@
+[project]
+name = "bulletin-board"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Zhigalkina Natalya",email = "story.hv@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "django (>=6.0.3,<7.0.0)",
+    "djangorestframework (>=3.17.1,<4.0.0)",
+    "psycopg2-binary (>=2.9.11,<3.0.0)",
+    "python-dotenv (>=1.2.2,<2.0.0)",
+    "djangorestframework-simplejwt (>=5.5.1,<6.0.0)",
+    "django-filter (>=25.2,<26.0)",
+    "django-cors-headers (>=4.9.0,<5.0.0)",
+    "drf-spectacular (>=0.29.0,<0.30.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.lint.dependencies]
+black = "^26.3.1"
+flake8 = "^7.3.0"
+isort = "^8.0.1"
+
+
+[tool.poetry.group.dev.dependencies]
+coverage = "^7.13.5"
+pytest = "^9.0.2"
+pytest-django = "^4.12.0"
+
+[tool.black]
+target-version = ["py313"]
+# Максимальная длина строки
+line-length = 119
+# Файлы, которые не нужно форматировать
+exclude = '''
+(
+  /(
+      \.eggs         # Исключить несколько общих каталогов
+    | \.git          # в корне проекта
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | dist
+  )/
+  | foo.py           # Также отдельно исключить файл с именем foo.py
+                     # в корне проекта
+)
+'''
+
+[tool.isort]
+# максимальная длина строки
+line_length = 119
