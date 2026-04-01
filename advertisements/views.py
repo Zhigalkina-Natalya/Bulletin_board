@@ -1,9 +1,11 @@
 from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.permissions import IsAdminUser, IsAuthenticatedOrReadOnly, AllowAny
 from rest_framework.viewsets import ModelViewSet
 
 from .models import Ad, Category
+from .pagination import AdPagination
 from .permissions import IsOwnerOrReadOnly
 from .serializers import AdSerializer, CategorySerializer
 
@@ -18,6 +20,7 @@ class CategoryViewSet(ModelViewSet):
 
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
             return [AllowAny()]
@@ -44,9 +47,16 @@ class AdViewSet(ModelViewSet):
     queryset = Ad.objects.all()
     serializer_class = AdSerializer
     permission_classes = [IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
+    pagination_class = AdPagination
 
-    filter_backends = [DjangoFilterBackend]
+    # фильтрация + поиск + сортировка
+    filter_backends = [DjangoFilterBackend, OrderingFilter, SearchFilter]
     filterset_class = AdFilter
+
+    ordering_fields = ["price", "created_at"]
+    ordering = ["-created_at"]
+
+    search_fields = ["title", "description"]
 
     def perform_create(self, serializer):
         """Автоматически устанавливает автора объявления."""
