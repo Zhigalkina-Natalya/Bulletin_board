@@ -1,6 +1,6 @@
 from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.permissions import IsAdminUser, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAdminUser, IsAuthenticatedOrReadOnly, AllowAny
 from rest_framework.viewsets import ModelViewSet
 
 from .models import Ad, Category
@@ -18,7 +18,10 @@ class CategoryViewSet(ModelViewSet):
 
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
-    permission_classes = [IsAdminUser]
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [AllowAny()]
+        return [IsAdminUser()]
 
 
 class AdFilter(filters.FilterSet):

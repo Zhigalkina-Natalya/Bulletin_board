@@ -56,6 +56,14 @@ class Ad(models.Model):
         help_text="Выберите категорию",
     )
 
+    image = models.ImageField(
+        upload_to="ads/images/",
+        blank=True,
+        null=True,
+        verbose_name="Изображение",
+        help_text="Загрузите изображение объявления",
+    )
+
     created_at = models.DateTimeField(
         auto_now_add=True,
         verbose_name="Дата создания",

@@ -117,3 +117,5 @@ SPECTACULAR_SETTINGS = {
     "DESCRIPTION": "API для доски объявлений",
     "VERSION": "1.0.0",
 }
+
+CORS_ALLOW_ALL_ORIGINS = True
