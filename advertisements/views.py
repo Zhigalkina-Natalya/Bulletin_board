@@ -8,6 +8,7 @@ from .models import Ad, Category
 from .pagination import AdPagination
 from .permissions import IsOwnerOrManagerOrReadOnly
 from .serializers import AdSerializer, CategorySerializer
+from .tasks import notify_new_ad
 
 
 class CategoryViewSet(ModelViewSet):
@@ -64,4 +65,5 @@ class AdViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         """Автоматически устанавливает автора объявления."""
-        serializer.save(author=self.request.user)
+        ad = serializer.save(author=self.request.user)
+        notify_new_ad.delay(ad.title)
