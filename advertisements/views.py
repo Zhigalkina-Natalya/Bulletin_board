@@ -1,12 +1,12 @@
 from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter, SearchFilter
-from rest_framework.permissions import IsAdminUser, IsAuthenticatedOrReadOnly, AllowAny
+from rest_framework.permissions import IsAdminUser, IsAuthenticatedOrReadOnly, AllowAny, IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
 
 from .models import Ad, Category
 from .pagination import AdPagination
-from .permissions import IsOwnerOrReadOnly
+from .permissions import IsOwnerOrManagerOrReadOnly
 from .serializers import AdSerializer, CategorySerializer
 
 
@@ -24,6 +24,10 @@ class CategoryViewSet(ModelViewSet):
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
             return [AllowAny()]
+
+        if self.request.user.groups.filter(name="Content Manager").exists():
+            return [IsAuthenticated()]
+
         return [IsAdminUser()]
 
 
@@ -46,7 +50,7 @@ class AdViewSet(ModelViewSet):
 
     queryset = Ad.objects.all()
     serializer_class = AdSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly, IsOwnerOrReadOnly]
+    permission_classes = [IsAuthenticatedOrReadOnly, IsOwnerOrManagerOrReadOnly]
     pagination_class = AdPagination
 
     # фильтрация + поиск + сортировка
