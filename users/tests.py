@@ -65,3 +65,87 @@ class UserModelTestCase(TestCase):
         """Email обязателен"""
         with self.assertRaises(TypeError):
             User.objects.create_user(password="123456")
+
+
+class UserSerializerTestCase(APITestCase):
+    """Тесты сериализаторов пользователей"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(email="user@example.com", password="123456")
+
+    def test_change_password_serializer_valid(self):
+        from users.serializers import ChangePasswordSerializer
+
+        serializer = ChangePasswordSerializer(
+            data={"old_password": "123456", "new_password": "abcdef"},
+            context={"request": type("Req", (), {"user": self.user})()},
+        )
+        self.assertTrue(serializer.is_valid())
+
+    def test_change_password_serializer_invalid_old(self):
+        from users.serializers import ChangePasswordSerializer
+
+        serializer = ChangePasswordSerializer(
+            data={"old_password": "wrong", "new_password": "abcdef"},
+            context={"request": type("Req", (), {"user": self.user})()},
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("old_password", serializer.errors)
+
+    def test_change_password_serializer_short_new(self):
+        from users.serializers import ChangePasswordSerializer
+
+        serializer = ChangePasswordSerializer(
+            data={"old_password": "123456", "new_password": "123"},
+            context={"request": type("Req", (), {"user": self.user})()},
+        )
+        self.assertFalse(serializer.is_valid())
+        self.assertIn("new_password", serializer.errors)
+
+    def test_user_register_serializer(self):
+        from users.serializers import UserRegisterSerializer
+
+        data = {"email": "new@example.com", "password": "123456"}
+        serializer = UserRegisterSerializer(data=data)
+        self.assertTrue(serializer.is_valid())
+        user = serializer.save()
+        self.assertEqual(user.email, "new@example.com")
+
+
+#
+# class UserViewsTestCase(APITestCase):
+#     """Тесты views пользователей"""
+#
+#     def setUp(self):
+#         self.user = User.objects.create_user(email="test2@example.com", password="123456")
+#         self.client.force_authenticate(user=self.user)
+#
+#     def test_change_password_view_success(self):
+#         from django.urls import reverse
+#         url = reverse("change_password")
+#         response = self.client.post(url, {"old_password": "123456", "new_password": "abcdef"})
+#         self.assertEqual(response.status_code, 200)
+#         self.user.refresh_from_db()
+#         self.assertTrue(self.user.check_password("abcdef"))
+#
+#     def test_change_password_view_wrong_old(self):
+#         from django.urls import reverse
+#         url = reverse("change_password")
+#         response = self.client.post(url, {"old_password": "wrong", "new_password": "abcdef"})
+#         self.assertEqual(response.status_code, 400)
+#
+#     def test_profile_view_get(self):
+#         from django.urls import reverse
+#         url = reverse("profile")
+#         response = self.client.get(url)
+#         self.assertEqual(response.status_code, 200)
+#         self.assertEqual(response.data["email"], self.user.email)
+#
+#     def test_profile_view_update(self):
+#         from django.urls import reverse
+#         url = reverse("profile")
+#         response = self.client.put(url, {"phone": "+7123456789", "city": "Москва"})
+#         self.assertEqual(response.status_code, 200)
+#         self.user.refresh_from_db()
+#         self.assertEqual(self.user.phone, "+7123456789")
+#         self.assertEqual(self.user.city, "Москва")
