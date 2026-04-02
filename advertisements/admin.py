@@ -1,10 +1,12 @@
 from django.contrib import admin
 from django.utils.html import format_html
+
 from .models import Ad, Category
 
 
 class AdInline(admin.TabularInline):
     """Inline объявления внутри категории."""
+
     model = Ad
     extra = 0
 
