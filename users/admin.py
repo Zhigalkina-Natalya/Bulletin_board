@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.utils.html import format_html
+
 from .models import User
 
 
@@ -22,7 +23,14 @@ class UserAdmin(BaseUserAdmin):
     )
 
     add_fieldsets = (
-        (None, {"classes": ("wide",), "fields": ("email", "password1", "password2"), },),)
+        (
+            None,
+            {
+                "classes": ("wide",),
+                "fields": ("email", "password1", "password2"),
+            },
+        ),
+    )
 
     def avatar_preview(self, obj):
         """Показывает миниатюру аватарки."""
