@@ -1,3 +1,4 @@
+from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -22,17 +23,20 @@ class UserSerializer(serializers.ModelSerializer):
 class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
     """Кастомный сериализатор для получения JWT токена по email."""
 
-    username_field = "email"
+    username_field = User.EMAIL_FIELD
 
 
 class UserRegisterSerializer(serializers.ModelSerializer):
-    """Регистрация пользователя."""
-
     password = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
         fields = ["email", "password"]
+
+    def validate_email(self, value):
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("Пользователь с таким email уже существует")
+        return value
 
     def create(self, validated_data):
         return User.objects.create_user(**validated_data)
@@ -52,7 +56,6 @@ class ChangePasswordSerializer(serializers.Serializer):
         return value
 
     def validate_new_password(self, value):
-        """Можно добавить валидацию сложности пароля, указав количество символов."""
-        if len(value) < 5:
-            raise serializers.ValidationError("Пароль должен быть не менее 5 символов")
+        """Валидация нового пароля через системную проверку Django"""
+        validate_password(value)
         return value

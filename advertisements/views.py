@@ -1,12 +1,13 @@
+from django.db.models import Q
 from django_filters import rest_framework as filters
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter, SearchFilter
-from rest_framework.permissions import AllowAny, IsAdminUser, IsAuthenticated, IsAuthenticatedOrReadOnly
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAuthenticatedOrReadOnly
 from rest_framework.viewsets import ModelViewSet
 
 from .models import Ad, Category
 from .pagination import AdPagination
-from .permissions import IsOwnerOrManagerOrReadOnly
+from .permissions import IsAdmin, IsOwnerOrManagerOrReadOnly
 from .serializers import AdSerializer, CategorySerializer
 from .tasks import notify_new_ad
 
@@ -21,6 +22,7 @@ class CategoryViewSet(ModelViewSet):
 
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    permission_classes = [IsAdmin]
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
@@ -29,7 +31,7 @@ class CategoryViewSet(ModelViewSet):
         if self.request.user.groups.filter(name="Content Manager").exists():
             return [IsAuthenticated()]
 
-        return [IsAdminUser()]
+        return [IsAdmin()]
 
 
 class AdFilter(filters.FilterSet):
@@ -62,6 +64,29 @@ class AdViewSet(ModelViewSet):
     ordering = ["-created_at"]
 
     search_fields = ["title", "description"]
+
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [AllowAny()]
+        return [permission() for permission in self.permission_classes]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        # неавторизованные - только активные
+        if not user.is_authenticated:
+            return Ad.objects.filter(is_active=True)
+
+        # админ - видит всё
+        if user.is_staff or user.is_superuser:
+            return Ad.objects.all()
+
+        # менеджер - видит всё
+        if user.groups.filter(name="Content Manager").exists():
+            return Ad.objects.all()
+
+        # автор: свои + активные чужие
+        return Ad.objects.filter(Q(is_active=True) | Q(author=user))
 
     def perform_create(self, serializer):
         """Автоматически устанавливает автора объявления."""

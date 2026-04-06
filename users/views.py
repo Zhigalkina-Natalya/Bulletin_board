@@ -1,8 +1,7 @@
 from rest_framework import status
-from rest_framework.generics import CreateAPIView, RetrieveUpdateAPIView
+from rest_framework.generics import CreateAPIView, GenericAPIView, RetrieveUpdateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .models import User
@@ -23,6 +22,16 @@ class ProfileView(RetrieveUpdateAPIView):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
 
+    def get(self, request):
+        serializer = self.serializer_class(request.user)
+        return Response(serializer.data)
+
+    def put(self, request):
+        serializer = self.serializer_class(request.user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
     def get_object(self):
         """Возвращает текущего пользователя."""
         return self.request.user
@@ -35,7 +44,7 @@ class RegisterView(CreateAPIView):
     serializer_class = UserRegisterSerializer
 
 
-class ChangePasswordView(APIView):
+class ChangePasswordView(GenericAPIView):
     """Смена пароля пользователя."""
 
     permission_classes = [IsAuthenticated]

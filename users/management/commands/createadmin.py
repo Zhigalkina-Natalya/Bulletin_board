@@ -1,20 +1,25 @@
+from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
+from django.db.utils import IntegrityError
 
-from users.models import User
+User = get_user_model()
 
 
 class Command(BaseCommand):
-    """Команда создания администратора."""
+    help = "Создание администратора через input"
 
     def handle(self, *args, **options):
-        if User.objects.filter(email="admin@example.com").exists():
-            self.stdout.write(self.style.WARNING("Администратор уже существует"))
-            return
+        email = input("Введите email администратора: ").strip()
 
-        user = User.objects.create(email="admin@example.com")
-        user.set_password("12345")
-        user.is_active = True
-        user.is_staff = True
-        user.is_superuser = True
-        user.save()
-        self.stdout.write(self.style.SUCCESS(f"Администратор успешно создан с email {user.email}"))
+        password = input("Введите пароль администратора: ").strip()
+
+        try:
+            user, created = User.objects.get_or_create(email=email, defaults={"is_staff": True, "is_superuser": True})
+            if created:
+                user.set_password(password)
+                user.save()
+                self.stdout.write(self.style.SUCCESS(f"Администратор успешно создан с email {email}"))
+            else:
+                self.stdout.write(self.style.WARNING("Администратор уже существует"))
+        except IntegrityError:
+            self.stdout.write(self.style.WARNING("Администратор уже существует (ошибка базы данных)"))

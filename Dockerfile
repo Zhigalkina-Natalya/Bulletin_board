@@ -10,7 +10,7 @@ WORKDIR /app
 
 # Устанавливаем системные зависимости
 RUN apt-get update \
-    && apt-get install -y gcc libpq-dev \
+    && apt-get install -y gcc libpq-dev libmagic1 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -18,7 +18,7 @@ RUN apt-get update \
 COPY pyproject.toml poetry.lock* ./
 
 # Устанавливаем Poetry
-RUN pip install poetry
+RUN pip install --no-cache-dir poetry
 
 # Устанавливаем зависимости
 RUN poetry config virtualenvs.create false \
@@ -27,8 +27,13 @@ RUN poetry config virtualenvs.create false \
 # Копируем проект
 COPY . .
 
+# Создаем пользователя для запуска приложения
+RUN useradd -m appuser
+RUN mkdir -p /app/media && chmod -R 777 /app/media
+USER appuser
+
 # Открываем порт
 EXPOSE 8000
 
 # Команда запуска
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]

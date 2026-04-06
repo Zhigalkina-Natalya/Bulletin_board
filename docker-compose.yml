@@ -1,32 +1,30 @@
 version: "3.9"
 
 services:
-
   db:
     image: postgres:16
-    container_name: postgres_db
+    container_name: postgres_dev
     restart: always
-    environment:
-      POSTGRES_DB: bulletin_board
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: 12345
+    env_file:
+      - .env
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_dev:/var/lib/postgresql/data
     ports:
       - "5432:5432"
 
   redis:
     image: redis:7
-    container_name: redis
+    container_name: redis_dev
     ports:
       - "6379:6379"
 
   web:
     build: .
-    container_name: django_app
+    container_name: django_dev
     command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
     volumes:
       - .:/app
+      - media_data_dev:/app/media
     ports:
       - "8000:8000"
     env_file:
@@ -37,15 +35,17 @@ services:
 
   celery:
     build: .
-    container_name: celery_worker
+    container_name: celery_dev
     command: celery -A config worker --loglevel=info
     volumes:
       - .:/app
+      - media_data_dev:/app/media
+    env_file:
+      - .env
     depends_on:
       - db
       - redis
-    env_file:
-      - .env
 
 volumes:
-  postgres_data:
+  postgres_data_dev:
+  media_data_dev:

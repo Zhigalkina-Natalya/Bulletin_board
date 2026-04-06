@@ -20,11 +20,7 @@ class AdTestCase(APITestCase):
         self.category = Category.objects.create(name="Недвижимость")
 
         self.ad = Ad.objects.create(
-            title="Тест объявление",
-            description="Описание",
-            price=1000,
-            author=self.user,
-            category=self.category
+            title="Тест объявление", description="Описание", price=1000, author=self.user, category=self.category
         )
 
     def test_get_ads_list(self):
@@ -32,6 +28,7 @@ class AdTestCase(APITestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("results", response.data)
 
     @patch("advertisements.tasks.notify_new_ad.delay")
     def test_create_ad(self, mock_notify):
@@ -39,16 +36,12 @@ class AdTestCase(APITestCase):
 
         url = reverse("advertisements:ad-list")
 
-        data = {
-            "title": "Новое объявление",
-            "description": "Описание",
-            "price": 2000,
-            "category": self.category.id
-        }
+        data = {"title": "Новое объявление", "description": "Описание", "price": 2000, "category": self.category.id}
 
         response = self.client.post(url, data)
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["author"], self.user.email)
         mock_notify.assert_called_once()  # проверяем celery
 
     def test_delete_ad_only_owner(self):
@@ -78,34 +71,54 @@ class AdTestCase(APITestCase):
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(len(response.data["results"]), 1)
 
     def test_search(self):
         url = reverse("advertisements:ad-list") + "?search=Тест"
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(len(response.data["results"]), 1)
 
     def test_ordering(self):
         url = reverse("advertisements:ad-list") + "?ordering=price"
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(float(response.data["results"][0]["price"]), 1000)
+
+    def test_inactive_ads_hidden(self):
+        Ad.objects.create(
+            title="Скрытое", description="...", price=100, author=self.user, category=self.category, is_active=False
+        )
+
+        response = self.client.get(reverse("advertisements:ad-list"))
+
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_update_ad(self):
         self.client.force_authenticate(user=self.user)
 
         url = reverse("advertisements:ad-detail", args=[self.ad.id])
 
-        data = {
-            "title": "Обновлено",
-            "description": "Описание",
-            "price": 1500,
-            "category": self.category.id
-        }
+        data = {"title": "Обновлено", "description": "Описание", "price": 1500, "category": self.category.id}
 
         response = self.client.put(url, data)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["title"], "Обновлено")
+
+    def test_user_sees_only_active_ads(self):
+        self.client.force_authenticate(user=self.other_user)
+
+        Ad.objects.create(
+            title="Неактивное", description="...", price=500, author=self.user, category=self.category, is_active=False
+        )
+
+        response = self.client.get(reverse("advertisements:ad-list"))
+
+        for ad in response.data["results"]:
+            self.assertTrue(ad["is_active"])
 
 
 class PermissionTestCase(APITestCase):
@@ -120,11 +133,7 @@ class PermissionTestCase(APITestCase):
         self.category = Category.objects.create(name="Тест")
 
         self.ad = Ad.objects.create(
-            title="Объявление",
-            description="Описание",
-            price=1000,
-            author=self.user1,
-            category=self.category
+            title="Объявление", description="Описание", price=1000, author=self.user1, category=self.category
         )
 
         # добавили группу Content Manager
@@ -165,6 +174,16 @@ class PermissionTestCase(APITestCase):
 
         self.assertTrue(permission.has_object_permission(request, None, self.ad))
 
+    def test_admin_can_edit(self):
+        admin = User.objects.create_user(email="admin@test.com", password="123456", is_staff=True)
+
+        request = self.factory.put("/")
+        request.user = admin
+
+        permission = IsOwnerOrManagerOrReadOnly()
+
+        self.assertTrue(permission.has_object_permission(request, None, self.ad))
+
 
 class TaskTestCase(APITestCase):
     """Тестирование Celery задач"""
@@ -172,5 +191,98 @@ class TaskTestCase(APITestCase):
     @patch("builtins.print")
     def test_notify_new_ad(self, mock_print):
         from advertisements.tasks import notify_new_ad
+
         notify_new_ad("Тестовое объявление")
-        mock_print.assert_called_once_with("Новое объявление создано: Тестовое объявление")  # 🟢 новый тест
+        mock_print.assert_called_once_with("Новое объявление создано: Тестовое объявление")
+
+
+class AdditionalAdTests(APITestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user(email="user@test.com", password="123456")
+        self.admin = User.objects.create_user(email="admin@test.com", password="123456", is_staff=True)
+
+        self.category = Category.objects.create(name="Авто")
+
+        self.ad = Ad.objects.create(
+            title="BMW", description="Машина", price=1000, author=self.user, category=self.category
+        )
+
+    def test_admin_sees_all_ads(self):
+        """Админ видит все объявления (включая неактивные)"""
+        self.client.force_authenticate(user=self.admin)
+
+        Ad.objects.create(
+            title="Скрытое", description="...", price=500, author=self.user, category=self.category, is_active=False
+        )
+
+        response = self.client.get(reverse("advertisements:ad-list"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertGreaterEqual(len(response.data["results"]), 2)
+
+    def test_category_str(self):
+        """Проверка __str__ категории"""
+        self.assertEqual(str(self.category), "Авто")
+
+    def test_ad_str(self):
+        """Проверка __str__ объявления"""
+        self.assertEqual(str(self.ad), "BMW")
+
+    def test_permission_safe_method(self):
+        """SAFE метод разрешен всем"""
+        permission = IsOwnerOrManagerOrReadOnly()
+        request = APIRequestFactory().get("/")
+        request.user = self.user
+
+        self.assertTrue(permission.has_object_permission(request, None, self.ad))
+
+    def test_permission_denied_for_random_user(self):
+        """Чужой пользователь не может редактировать"""
+        other = User.objects.create_user(email="other@test.com", password="123456")
+
+        permission = IsOwnerOrManagerOrReadOnly()
+        request = APIRequestFactory().put("/")
+        request.user = other
+
+        self.assertFalse(permission.has_object_permission(request, None, self.ad))
+
+
+class AdViewExtraTestCase(APITestCase):
+    """Дополнительные тесты для покрытия views"""
+
+    def setUp(self):
+        self.user = User.objects.create_user(email="user@test.com", password="123456")
+        self.admin = User.objects.create_user(
+            email="admin@test.com", password="123456", is_staff=True, is_superuser=True
+        )
+
+        self.category = Category.objects.create(name="Тест")
+
+        self.active_ad = Ad.objects.create(
+            title="Активное", description="...", price=100, author=self.user, category=self.category, is_active=True
+        )
+
+        self.inactive_ad = Ad.objects.create(
+            title="Неактивное", description="...", price=200, author=self.user, category=self.category, is_active=False
+        )
+
+    def test_create_ad_unauthorized(self):
+        """Нельзя создать без авторизации"""
+        url = reverse("advertisements:ad-list")
+
+        response = self.client.post(url, {})
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_partial_update(self):
+        """PATCH обновление"""
+        self.client.force_authenticate(user=self.user)
+
+        url = reverse("advertisements:ad-detail", args=[self.active_ad.id])
+
+        response = self.client.patch(url, {"price": 999})
+
+        self.assertEqual(response.status_code, 200)
+        self.active_ad.refresh_from_db()
+        self.assertEqual(self.active_ad.price, 999)

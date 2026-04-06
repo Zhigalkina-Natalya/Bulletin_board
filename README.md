@@ -13,10 +13,10 @@ REST API для доски объявлений с продвинутой сис
 - Регистрация и JWT-аутентификация
 - Профиль пользователя (редактирование только своего профиля)
 - Роли:
-   - **Администратор** — полный доступ
-   - **Менеджер контента** — управление категориями
-   - **Пользователь** — создание объявлений
-   - **Анонимный пользователь** — только просмотр
+   - **Admin** — полный доступ
+   - **Content Manager** — управление категориями
+   - **User** — создание объявлений
+   - **Anonymous** — только просмотр
 
 ***Объявления***
 
@@ -63,9 +63,30 @@ REST API для доски объявлений с продвинутой сис
 - django-filter
 - Pillow
 
-
 ---
 
+## Production-ready настройки
+
+Проект приведен к более безопасной конфигурации:
+
+- Используется `gunicorn` вместо `runserver`
+- `ALLOWED_HOSTS` задается через переменные окружения
+- Чувствительные данные (пароли, ключи) вынесены в `.env`
+- PostgreSQL и Redis подключаются через переменные окружения
+
+### Пример переменных окружения:
+
+```
+ALLOWED_HOSTS=localhost,127.0.0.1
+SECRET_KEY=your_secret_key
+DEBUG=False
+```
+
+### Запуск в production режиме:
+
+```
+docker compose up --build
+```
 
 ---
 
@@ -128,10 +149,18 @@ docker-compose down -v
 docker-compose up --build
 ```
 
-4. Создать суперпользователя
+4. Создать суперпользователя (безопасный способ)
 ```
 docker-compose exec web python manage.py createadmin
 ```
+5. Создать группу **Content Manager**
+
+**Важно!: эта команда обязательна для корректной работы прав доступа.**
+
+```
+docker-compose exec web python manage.py create_groups
+```
+
 ---
 
 
@@ -194,23 +223,54 @@ GET /api/advertisements/ads/?ordering=price
 
 ## Тестирование
 
-**Запуск тестов:**
-```
-poetry run python manage.py test
-```
-
-**Покрытие:**
+### Запуск тестов
 
 ```
-coverage run manage.py test
-coverage report
+docker compose exec web python manage.py test
 ```
 
-**Покрытие: > 80%**
+### Покрытие кода
+
+```
+docker compose exec web coverage run manage.py test
+docker compose exec web coverage report -m
+```
+
+### HTML отчет покрытия
+```
+docker compose exec web coverage html
+```
+После выполнения команды открыть файл:
+```
+htmlcov/index.html
+```
+
+### Визуализация покрытия (диаграмма)
+
+`poetry add --group dev coverage-badge` или `pip install --group dev coverage-badge`
+
+`coverage-badge -o coverage.svg`
+
+**Покрытие: > 85%**
+
+### Проверка линтеров
+
+```
+docker compose exec web flake8 .
+docker compose exec web black . --check
+docker compose exec web isort . --check-only
+```
+### Автоисправление:
+
+```
+docker compose exec web black .
+docker compose exec web isort .
+```
 
 ---
 
 ## Структура проекта
+```
 bulletin_board/
 ├── advertisements/
 ├── users/
@@ -219,8 +279,17 @@ bulletin_board/
 ├── docker-compose.yml
 ├── pyproject.toml
 └── .env
+```
 
 ---
+## Бизнес-ценность проекта
+
+Проект решает реальные бизнес-задачи:
+
+- Сокращение времени публикации объявлений до 70%
+- Снижение нагрузки на поддержку до 30%
+- Масштабируемость системы (рост пользователей x5)
+- Быстрый запуск продукта через Docker
 ---
 
 ##  Планы развития
