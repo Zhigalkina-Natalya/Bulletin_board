@@ -1,0 +1,51 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    container_name: postgres_prod
+    restart: always
+    env_file:
+      - .env.prod
+    volumes:
+      - postgres_data_prod:/var/lib/postgresql/data
+    ports:
+      - "5433:5432" # другой порт, чтобы не мешать dev
+
+  redis:
+    image: redis:7
+    container_name: redis_prod
+    ports:
+      - "6380:6379" # другой порт
+
+  web:
+    build: .
+    container_name: django_prod
+    command: sh -c "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:8000"
+    volumes:
+      - .:/app
+      - media_data_prod:/app/media
+    ports:
+      - "8001:8000" # другой порт
+    env_file:
+      - .env.prod
+    depends_on:
+      - db
+      - redis
+
+  celery:
+    build: .
+    container_name: celery_prod
+    command: celery -A config worker --loglevel=info
+    volumes:
+      - .:/app
+      - media_data_prod:/app/media
+    env_file:
+      - .env.prod
+    depends_on:
+      - db
+      - redis
+
+volumes:
+  postgres_data_prod:
+  media_data_prod:
